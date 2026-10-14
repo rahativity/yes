@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Respiratory System - Online MCQ Exam</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#f3f6fb;color:#1f2937;line-height:1.5}
+  .wrap{max-width:760px;margin:0 auto;padding:16px}
+  .card{background:#fff;border-radius:12px;padding:20px;margin-bottom:16px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+  h1{margin:0 0 6px;font-size:24px;color:#0f4c81}
+  input{width:100%;padding:12px;margin:6px 0 12px;border:1px solid #cbd5e1;border-radius:8px;font-size:16px}
+  button{background:#0f4c81;color:#fff;border:0;padding:12px 22px;border-radius:8px;font-size:16px;cursor:pointer}
+  button:hover{background:#0b3a63}
+  .bar{position:sticky;top:0;z-index:5;background:#0f4c81;color:#fff;padding:10px 16px;display:flex;justify-content:space-between;font-weight:bold}
+  .q{font-weight:bold;margin-bottom:10px}
+  .opt{display:block;padding:10px 12px;margin:6px 0;border:1px solid #cbd5e1;border-radius:8px;cursor:pointer}
+  .opt:hover{background:#eef4fb}
+  .opt input{width:auto;margin:0 8px 0 0}
+  .opt.ok{background:#dcfce7;border-color:#16a34a}
+  .opt.bad{background:#fee2e2;border-color:#dc2626}
+  svg{max-width:100%;height:auto;background:#fafcff;border:1px solid #e2e8f0;border-radius:8px;margin:6px 0 10px}
+  .score{font-size:34px;font-weight:bold;color:#0f4c81}
+  .hide{display:none}
+  .note{font-size:14px;color:#64748b}
+  @media print{.bar,button,.noprint{display:none!important}}
+</style>
+</head>
+<body>
+
+<div id="start" class="wrap">
+  <div class="card">
+    <h1>Respiratory System - MCQ Exam</h1>
+    <p>30 questions &bull; 30 minutes &bull; 1 mark each</p>
+    <p class="note">Enter your name and roll, then click Start Exam. The exam will be submitted automatically when time runs out.</p>
+    <label>Name</label><input id="name" placeholder="Your name">
+    <label>Roll</label><input id="roll" placeholder="Your roll">
+    <button onclick="startExam()">Start Exam</button>
+  </div>
+</div>
+
+<div id="exam" class="hide">
+  <div class="bar"><span id="progress">Answered: 0/30</span><span id="timer">30:00</span></div>
+  <div class="wrap">
+    <div id="questions"></div>
+    <button onclick="finish(false)">Submit Exam</button>
+  </div>
+</div>
+
+<div id="result" class="wrap hide">
+  <div class="card">
+    <div id="who"></div>
+    <div class="score" id="score"></div>
+    <div id="pct"></div>
+    <button class="noprint" onclick="window.print()" style="margin-top:12px">Print / Save as PDF</button>
+  </div>
+  <div id="review"></div>
+</div>
+
+<script>
+const DURATION = 30 * 60; // seconds
+
+// ---------- SVG images ----------
+const svgOpen = '<svg viewBox="0 0 300 200" xmlns="http://www.w3.org/2000/svg" font-family="Arial" font-size="14">';
+const IMG = {
+  system: svgOpen +
+    '<ellipse cx="80" cy="25" rx="30" ry="14" fill="#fde68a" stroke="#333"/><text x="68" y="30">A</text>' +
+    '<rect x="72" y="40" width="16" height="70" fill="#fecaca" stroke="#333"/>' +
+    '<g stroke="#333" fill="none"><path d="M72 50h16M72 60h16M72 70h16M72 80h16M72 90h16M72 100h16"/></g>' +
+    '<text x="95" y="80">B</text>' +
+    '<path d="M80 110 L45 130 M80 110 L115 130" stroke="#333" stroke-width="3"/>' +
+    '<ellipse cx="190" cy="100" rx="45" ry="60" fill="#fbcfe8" stroke="#333"/><text x="185" y="105">C</text>' +
+    '<path d="M40 175 Q150 145 260 175" fill="#c7d2fe" stroke="#333"/><text x="140" y="185">D</text></svg>',
+  leaf: svgOpen +
+    '<rect width="300" height="200" fill="#1e293b"/>' +
+    '<path d="M60 100 Q150 20 240 100 Q150 180 60 100Z" fill="#4ade80" stroke="#14532d"/>' +
+    '<path d="M60 100H240" stroke="#14532d"/>' +
+    '<text x="10" y="30" fill="#fff">Night</text>' +
+    '<text x="120" y="30" fill="#fde68a">O&#8322; in</text><path d="M135 35V70" stroke="#fde68a" stroke-width="3"/>' +
+    '<text x="120" y="190" fill="#fca5a5">CO&#8322; out</text><path d="M135 130V165" stroke="#fca5a5" stroke-width="3"/></svg>',
+  lungs: svgOpen +
+    '<ellipse cx="85" cy="100" rx="55" ry="75" fill="#fbcfe8" stroke="#333"/>' +
+    '<path d="M40 75Q85 90 125 70M45 125Q85 110 128 130" stroke="#333" fill="none"/><text x="80" y="195">P</text>' +
+    '<ellipse cx="215" cy="100" rx="50" ry="75" fill="#fbcfe8" stroke="#333"/>' +
+    '<path d="M170 100Q215 110 262 95" stroke="#333" fill="none"/><text x="212" y="195">Q</text></svg>',
+  alveoli: svgOpen +
+    '<path d="M20 100H110" stroke="#333" stroke-width="8"/>' +
+    '<circle cx="160" cy="60" r="32" fill="#fecaca" stroke="#333"/><circle cx="160" cy="140" r="32" fill="#fecaca" stroke="#333"/>' +
+    '<circle cx="225" cy="100" r="32" fill="#fecaca" stroke="#333"/>' +
+    '<path d="M110 100L140 75M110 100L140 125M110 100L195 100" stroke="#333" stroke-width="3"/>' +
+    '<text x="215" y="105" font-weight="bold">X</text>' +
+    '<path d="M240 40Q270 100 240 160" stroke="#dc2626" stroke-width="3" fill="none"/></svg>',
+  inhale: svgOpen +
+    '<ellipse cx="150" cy="85" rx="75" ry="70" fill="#fbcfe8" stroke="#333"/>' +
+    '<path d="M110 20Q95 85 110 150M190 20Q205 85 190 150M130 15Q120 85 130 155M170 15Q180 85 170 155" stroke="#555" fill="none"/>' +
+    '<path d="M70 165Q150 195 230 165" stroke="#333" stroke-width="4" fill="none"/>' +
+    '<path d="M150 170V195" stroke="#dc2626" stroke-width="3"/><path d="M142 188L150 198L158 188" fill="#dc2626"/>' +
+    '<path d="M45 85H20M255 85H280" stroke="#2563eb" stroke-width="3"/>' +
+    '<text x="10" y="75" fill="#2563eb">ribs out/up</text></svg>'
+};
+
+// ---------- Questions: q, options (first = correct), optional img ----------
+const QUESTIONS = [
+  {q:"Which is the main organ of respiration in humans?", o:["Lungs","Heart","Liver","Kidney"]},
+  {q:"Which structure prevents food from entering the windpipe while swallowing?", o:["Epiglottis","Larynx","Pharynx","Tongue"]},
+  {q:"The voice box is also known as the:", o:["Larynx","Pharynx","Trachea","Bronchus"]},
+  {q:"The trachea is kept open by:", o:["C-shaped cartilage rings","Bone rings","Muscle rings","Skin folds"]},
+  {q:"The trachea divides into two tubes called:", o:["Bronchi","Bronchioles","Alveoli","Pleura"]},
+  {q:"Gas exchange in the lungs takes place in the:", o:["Alveoli","Trachea","Bronchi","Larynx"]},
+  {q:"Which muscle separates the thoracic cavity from the abdominal cavity?", o:["Diaphragm","Biceps","Intercostal muscle","Triceps"]},
+  {q:"During inhalation, the diaphragm:", o:["Contracts and flattens","Relaxes and domes upward","Moves up","Does not change"]},
+  {q:"How many lobes does the right lung have?", o:["3","2","4","1"]},
+  {q:"How many lobes does the left lung have?", o:["2","3","4","1"]},
+  {q:"Pneumonia is an infection mainly of the:", o:["Lungs (alveoli)","Stomach","Liver","Brain"]},
+  {q:"Tuberculosis (TB) is caused by:", o:["Mycobacterium tuberculosis","Plasmodium","Influenza virus","Vibrio cholerae"]},
+  {q:"Asthma is mainly characterised by:", o:["Narrowing of air passages","Blocked blood vessels","Liver damage","Low blood sugar"]},
+  {q:"Inflammation of the bronchi is called:", o:["Bronchitis","Pneumonia","Asthma","Tuberculosis"]},
+  {q:"Through which structures does gaseous exchange occur in the leaves of plants?", o:["Stomata","Root hairs","Xylem","Phloem"]},
+  {q:"Gaseous exchange in the woody stems of plants occurs through:", o:["Lenticels","Stomata","Root cap","Flowers"]},
+  {q:"Which pigment carries oxygen in the blood?", o:["Haemoglobin","Chlorophyll","Melanin","Keratin"]},
+  {q:"Approximately what percentage of oxygen is present in the atmospheric air?", o:["21%","78%","0.04%","50%"]},
+  {q:"Compared with inhaled air, exhaled air contains more:", o:["Carbon dioxide","Oxygen","Nitrogen","Hydrogen"]},
+  {q:"Which of the following is NOT a part of the air passage?", o:["Oesophagus","Larynx","Trachea","Nasal cavity"]},
+  {q:"Smoking greatly increases the risk of:", o:["Lung cancer","Night blindness","Rickets","Goitre"]},
+  {q:"The wall of an alveolus is only one cell thick. This helps in:", o:["Fast diffusion of gases","Storing air","Producing sound","Filtering dust"]},
+  {q:"Which membrane covers the lungs?", o:["Pleura","Pericardium","Peritoneum","Meninges"]},
+  {q:"During exhalation:", o:["Diaphragm relaxes and ribs move down","Diaphragm contracts and ribs move up","Lungs expand","Air pressure inside falls"]},
+  {q:"Functions of the nasal cavity:\ni. Filters dust\nii. Warms the air\niii. Moistens the air\nWhich is correct?", o:["i, ii and iii","i and ii","ii and iii","i and iii"]},
+  {q:"Look at the diagram. Which labelled part is supported by C-shaped cartilage rings?", o:["B","A","C","D"], img:"system"},
+  {q:"Look at the figure of a leaf at night. Which process is shown?", o:["Respiration","Photosynthesis","Transpiration","Fermentation"], img:"leaf"},
+  {q:"Look at the two lungs. How many lobes does lung P have?", o:["3","2","1","4"], img:"lungs"},
+  {q:"What is the structure labelled X?", o:["Alveolus","Bronchiole","Trachea","Capillary"], img:"alveoli"},
+  {q:"Which process is shown in the diagram of the chest?", o:["Inhalation","Exhalation","Transpiration","Digestion"], img:"inhale"}
+];
+
+let paper = [], answers = {}, timeLeft = DURATION, tick, student = {};
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function $(id){ return document.getElementById(id); }
+function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>'); }
+
+function startExam(){
+  const name = $('name').value.trim(), roll = $('roll').value.trim();
+  if(!name || !roll){ alert('Please enter your name and roll.'); return; }
+  student = {name, roll};
+  paper = shuffle(QUESTIONS.map(x => ({...x, opts: shuffle(x.o.slice())})));
+  const box = $('questions'); box.innerHTML = '';
+  paper.forEach((x,i) => {
+    box.insertAdjacentHTML('beforeend',
+      '<div class="card"><div class="q">' + (i+1) + '. ' + esc(x.q) + '</div>' +
+      (x.img ? IMG[x.img] : '') +
+      x.opts.map((t,k) => '<label class="opt"><input type="radio" name="q'+i+'" value="'+k+'" onchange="pick('+i+','+k+')">' + esc(t) + '</label>').join('') +
+      '</div>');
+  });
+  $('start').classList.add('hide'); $('exam').classList.remove('hide');
+  window.scrollTo(0,0);
+  tick = setInterval(() => {
+    timeLeft--; updateTimer();
+    if(timeLeft <= 0) finish(true);
+  }, 1000);
+  updateTimer();
+}
+
+function pick(i,k){ answers[i] = k; $('progress').textContent = 'Answered: ' + Object.keys(answers).length + '/' + paper.length; }
+
+function updateTimer(){
+  const m = String(Math.floor(timeLeft/60)).padStart(2,'0'), s = String(timeLeft%60).padStart(2,'0');
+  $('timer').textContent = m + ':' + s;
+}
+
+function finish(auto){
+  const left = paper.length - Object.keys(answers).length;
+  if(!auto && left > 0 && !confirm('You have ' + left + ' unanswered question(s). Submit anyway?')) return;
+  clearInterval(tick);
+  let score = 0, html = '';
+  paper.forEach((x,i) => {
+    const correct = x.opts.indexOf(x.o[0]);
+    if(answers[i] === correct) score++;
+    html += '<div class="card"><div class="q">' + (i+1) + '. ' + esc(x.q) + '</div>' + (x.img ? IMG[x.img] : '') +
+      x.opts.map((t,k) => {
+        let c = 'opt';
+        if(k === correct) c += ' ok'; else if(answers[i] === k) c += ' bad';
+        return '<div class="'+c+'">' + esc(t) + (k===correct?' &#10003;':'') + (answers[i]===k && k!==correct?' (your answer)':'') + '</div>';
+      }).join('') +
+      (answers[i] === undefined ? '<div class="note">Not answered</div>' : '') + '</div>';
+  });
+  $('who').innerHTML = '<b>' + esc(student.name) + '</b> &mdash; Roll: ' + esc(student.roll);
+  $('score').textContent = 'Score: ' + score + ' / ' + paper.length;
+  $('pct').textContent = Math.round(score / paper.length * 100) + '%';
+  $('review').innerHTML = html;
+  $('exam').classList.add('hide'); $('result').classList.remove('hide');
+  window.scrollTo(0,0);
+}
+</script>
+</body>
+</html>
